@@ -1,5 +1,6 @@
 use anyhow::anyhow;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
 
@@ -7,13 +8,17 @@ use crate::package::Package;
 
 #[derive(Serialize, Deserialize, Default)]
 pub struct Config {
-    pub packages: Vec<Package>,
+    pub packages: HashMap<String, Package>,
+}
+
+pub fn get_kura_path() -> anyhow::Result<PathBuf> {
+    Ok(dirs::data_dir()
+        .ok_or_else(|| anyhow!("Could not find data directory"))?
+        .join("kura"))
 }
 
 pub fn get_config_path() -> anyhow::Result<PathBuf> {
-    Ok(dirs::data_dir().ok_or_else(|| anyhow!("Could not find data directory"))?
-        .join("kura")
-        .join("config.toml"))
+    Ok(get_kura_path()?.join("config.toml"))
 }
 
 pub fn load_config() -> anyhow::Result<Config> {

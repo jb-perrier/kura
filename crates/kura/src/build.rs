@@ -1,19 +1,21 @@
 use anyhow::anyhow;
 
 use crate::config::load_config;
+use crate::BuildMode;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
 
 const TEMPLATE_MAIN: &str = include_str!("template_main.rs");
 
-pub fn load_cargo_toml<P: AsRef<Path>>(
-    folder_path: P,
-) -> anyhow::Result<toml::Value> {
+pub fn load_cargo_toml<P: AsRef<Path>>(folder_path: P) -> anyhow::Result<toml::Value> {
     let cargo_toml_path = folder_path.as_ref().join("Cargo.toml");
 
     if !cargo_toml_path.exists() {
-        return Err(anyhow!("Cargo.toml not found in {}", folder_path.as_ref().display()));
+        return Err(anyhow!(
+            "Cargo.toml not found in {}",
+            folder_path.as_ref().display()
+        ));
     }
 
     let content = fs::read_to_string(&cargo_toml_path)?;
@@ -22,12 +24,12 @@ pub fn load_cargo_toml<P: AsRef<Path>>(
     Ok(toml_value)
 }
 
-pub fn build_rust_project() -> anyhow::Result<()> {
+pub fn build_rust_project(build_mode: BuildMode) -> anyhow::Result<()> {
     let project_path = dirs::data_dir()
         .ok_or_else(|| anyhow!("Could not find app directory"))?
         .join("kura")
         .join("crates")
-        .join("kura-koto");
+        .join("koto-local");
 
     // Remove existing project if it exists
     if project_path.exists() {
@@ -39,7 +41,7 @@ pub fn build_rust_project() -> anyhow::Result<()> {
 
     // Initialize Rust binary project
     let init_output = Command::new("cargo")
-        .args(["init", "--bin", "--name", "kura-koto"])
+        .args(["init", "--bin", "--name", "koto-local"])
         .current_dir(&project_path)
         .output()?;
 
@@ -71,6 +73,9 @@ pub fn build_rust_project() -> anyhow::Result<()> {
     if !config.packages.is_empty() {
         let mut cargo_toml = load_cargo_toml(&project_path)?;
 
+        // Set [[bin]] name to "koto"
+        set_bin_name(&mut cargo_toml, "koto")?;
+
         // Initialize dependencies section if it doesn't exist
         if !cargo_toml
             .as_table()
@@ -91,12 +96,12 @@ pub fn build_rust_project() -> anyhow::Result<()> {
             .get_mut("dependencies")
             .and_then(|d| d.as_table_mut())
         {
-            for package in &config.packages {
+            for package in config.packages.values() {
                 let dep_value = toml::Value::Table({
                     let mut table = toml::map::Map::new();
                     table.insert(
                         "path".to_string(),
-                        toml::Value::String(package.name().to_string()),
+                        toml::Value::String(package.local_path().to_string()),
                     );
                     table
                 });
@@ -120,19 +125,45 @@ pub fn build_rust_project() -> anyhow::Result<()> {
     let main_rs_path = project_path.join("src").join("main.rs");
     fs::write(&main_rs_path, main_rs)?;
 
+    let args: &[&str] = match build_mode {
+        BuildMode::Debug => &["build"],
+        BuildMode::Release => &["build", "--release"],
+    };
+
     // Build the project
-    let build_output = Command::new("cargo")
-        .args(["build", "--release"])
+    let mut child = Command::new("cargo")
+        .args(args)
         .current_dir(&project_path)
-        .output()?;
+        .spawn()?;
 
-    if !build_output.status.success() {
-        return Err(anyhow!(
-            "Failed to build project: {}",
-            String::from_utf8_lossy(&build_output.stderr)
-        ));
+    child.wait()?;
+
+    println!("Koto built at: {}", project_path.display());
+    Ok(())
+}
+
+pub fn set_bin_name(cargo_toml: &mut toml::Value, name: &str) -> anyhow::Result<()> {
+    if let Some(bin_array) = cargo_toml.get_mut("bin").and_then(|b| b.as_array_mut()) {
+        for bin in bin_array.iter_mut() {
+            if let Some(bin_table) = bin.as_table_mut() {
+                bin_table.insert("name".to_string(), toml::Value::String(name.to_string()));
+                bin_table.insert(
+                    "path".to_string(),
+                    toml::Value::String("src/main.rs".to_string()),
+                );
+            }
+        }
+    } else {
+        let mut bin_table = toml::map::Map::new();
+        bin_table.insert("name".to_string(), toml::Value::String(name.to_string()));
+        bin_table.insert("path".to_string(), toml::Value::String("src/main.rs".to_string()));
+        let table = cargo_toml
+            .as_table_mut()
+            .ok_or_else(|| anyhow!("Invalid TOML structure"))?;
+        table.insert(
+            "bin".to_string(),
+            toml::Value::Array(vec![toml::Value::Table(bin_table)]),
+        );
     }
-
-    println!("Built project 'kura-koto' at: {}", project_path.display());
     Ok(())
 }

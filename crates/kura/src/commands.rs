@@ -1,8 +1,10 @@
 use std::fs;
+use std::io::Write;
 use std::process::Command;
 
 use anyhow::anyhow;
 
+use crate::BuildMode;
 use crate::build::build_rust_project;
 use crate::config::{load_config, save_config};
 use crate::package::{Package, PackageKind};
@@ -11,11 +13,7 @@ pub fn install_package(source: &str) -> anyhow::Result<()> {
     let mut config = load_config()?;
     let package = Package::from_source(source)?;
 
-    if config
-        .packages
-        .iter()
-        .any(|p| p.name() == package.name())
-    {
+    if config.packages.contains_key(package.name()) {
         println!("Package '{}' is already installed.", package.name());
         return Ok(());
     }
@@ -33,7 +31,7 @@ pub fn install_package(source: &str) -> anyhow::Result<()> {
                 .output()
                 .expect("Failed to clone GitHub repository");
         }
-        PackageKind::Local(_) => {}
+        PackageKind::Local => {}
     }
 
     println!(
@@ -41,17 +39,14 @@ pub fn install_package(source: &str) -> anyhow::Result<()> {
         package.name(),
         package.kind().name()
     );
-    config.packages.push(package);
+    config.packages.insert(package.name().to_string(), package);
     save_config(&config)?;
     Ok(())
 }
 
 pub fn remove_package(name: &str) -> anyhow::Result<()> {
     let mut config = load_config()?;
-    let initial_len = config.packages.len();
-    config.packages.retain(|package| package.name() != name);
-
-    if config.packages.len() < initial_len {
+    if config.packages.remove(name).is_some() {
         save_config(&config)?;
         println!("Removed package: {name}");
     } else {
@@ -82,39 +77,41 @@ pub fn list_packages() -> anyhow::Result<()> {
         println!("No packages installed.");
     } else {
         println!("Installed packages:");
-        for package in config.packages {
+        for package in config.packages.values() {
             println!("- {} ({})", package.name(), package.kind().name());
         }
     }
     Ok(())
 }
 
-pub fn run_project(filename: &str) -> anyhow::Result<()> {
+pub fn run_project(filename: &str, build_mode: BuildMode) -> anyhow::Result<()> {
     let project_path = dirs::data_dir()
         .ok_or_else(|| anyhow!("Could not find app directory"))?
         .join("kura")
         .join("crates")
-        .join("kura-koto");
+        .join("koto-local");
+
+    let build_mode_str = match build_mode {
+        BuildMode::Debug => "debug",
+        BuildMode::Release => "release",
+    };
 
     let executable_path = if cfg!(target_os = "windows") {
         project_path
             .join("target")
-            .join("release")
-            .join("kura-koto.exe")
+            .join(build_mode_str)
+            .join("koto.exe")
     } else {
-        project_path
-            .join("target")
-            .join("release")
-            .join("kura-koto")
+        project_path.join("target").join(build_mode_str).join("koto")
     };
 
     if !executable_path.exists() {
-        build_rust_project()?;
+        build_rust_project(build_mode)?;
     }
 
     let filename = std::fs::canonicalize(filename)?;
-    let mut child = Command::new(executable_path).arg(filename).spawn()?;
-
-    child.wait()?;
+    let output = Command::new(executable_path).arg(filename).output()?;
+    std::io::stdout().write_all(&output.stdout)?;
+    std::io::stderr().write_all(&output.stderr)?;
     Ok(())
 }

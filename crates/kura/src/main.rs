@@ -16,6 +16,20 @@ pub struct Cli {
     pub command: Commands,
 }
 
+use clap::ValueEnum;
+
+#[derive(Clone, Copy, Debug, ValueEnum)]
+pub enum BuildMode {
+    Debug,
+    Release,
+}
+
+impl Default for BuildMode {
+    fn default() -> Self {
+        BuildMode::Release
+    }
+}
+
 #[derive(Subcommand)]
 pub enum Commands {
     Install {
@@ -26,15 +40,20 @@ pub enum Commands {
         #[arg(help = "Package name")]
         name: String,
     },
-    Build,
+    Build {
+        #[arg(long, value_enum, help = "Run mode (debug or release)")]
+        build_mode: Option<BuildMode>,
+    },
     Run {
         #[arg(help = "Path to the file to run")]
         filename: String,
+
+        #[arg(long, value_enum, help = "Run mode (debug or release)")]
+        build_mode: Option<BuildMode>,
     },
     Clean,
     List,
 }
-
 
 fn main() {
     let cli = Cli::parse();
@@ -42,8 +61,11 @@ fn main() {
     let result = match cli.command {
         Commands::Install { source } => install_package(&source),
         Commands::Remove { name } => remove_package(&name),
-        Commands::Build => build_rust_project(),
-        Commands::Run { filename } => run_project(&filename),
+        Commands::Build { build_mode: mode } => build_rust_project(mode.unwrap_or_else(BuildMode::default)),
+        Commands::Run {
+            filename,
+            build_mode: mode,
+        } => run_project(&filename, mode.unwrap_or_else(BuildMode::default)),
         Commands::Clean => clean_project(),
         Commands::List => list_packages(),
     };

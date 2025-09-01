@@ -1,1 +1,3 @@
 demo_lib()
+print otherlib
+print (otherlib.say_hello_to "World")

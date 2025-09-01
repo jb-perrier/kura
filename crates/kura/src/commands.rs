@@ -1,62 +1,68 @@
 use std::fs;
 use std::process::Command;
 
+use anyhow::anyhow;
+
+use crate::build::build_rust_project;
 use crate::config::{load_config, save_config};
-use crate::package::{detect_package_type, extract_package_name};
+use crate::package::{Package, PackageKind};
 
-pub fn install_package(source: &str) {
-    let mut config = load_config();
+pub fn install_package(source: &str) -> anyhow::Result<()> {
+    let mut config = load_config()?;
+    let package = Package::from_source(source)?;
 
-    // Check if package already exists and update or add
-    if !config.packages.iter().any(|p| p == source) {
-        config.packages.push(source.to_string());
+    if config
+        .packages
+        .iter()
+        .any(|p| p.name() == package.name())
+    {
+        println!("Package '{}' is already installed.", package.name());
+        return Ok(());
     }
 
-    save_config(&config);
-    let package_type = detect_package_type(source);
-    let package_name = extract_package_name(source, &package_type);
-
-    match package_type {
-        crate::package::PackageType::Github => {
+    match package.kind() {
+        PackageKind::Github(repo) => {
             let dep_dir = dirs::data_dir()
                 .unwrap_or_else(|| dirs::home_dir().expect("Could not find home directory"))
                 .join("kura")
                 .join("crates");
             fs::create_dir_all(&dep_dir).expect("Failed to create directory");
             Command::new("git")
-                .args(["clone", source, package_name.as_str()])
+                .args(["clone", repo, package.name()])
                 .current_dir(dep_dir)
                 .output()
                 .expect("Failed to clone GitHub repository");
         }
-        crate::package::PackageType::Name => {
-            unimplemented!("Installing packages by name is not implemented yet.");
-        }
-        crate::package::PackageType::Local => {}
+        PackageKind::Local(_) => {}
     }
-    println!("Installed package: {package_name} ({package_type:?})");
+
+    println!(
+        "Installed package: {} ({})",
+        package.name(),
+        package.kind().name()
+    );
+    config.packages.push(package);
+    save_config(&config)?;
+    Ok(())
 }
 
-pub fn remove_package(name: &str) {
-    let mut config = load_config();
+pub fn remove_package(name: &str) -> anyhow::Result<()> {
+    let mut config = load_config()?;
     let initial_len = config.packages.len();
-    config.packages.retain(|package_source| {
-        let package_type = detect_package_type(package_source);
-        let package_name = extract_package_name(package_source, &package_type);
-        package_name != name
-    });
+    config.packages.retain(|package| package.name() != name);
 
     if config.packages.len() < initial_len {
-        save_config(&config);
+        save_config(&config)?;
         println!("Removed package: {name}");
     } else {
         eprintln!("Package '{name}' not found.");
     }
+    Ok(())
 }
 
-pub fn clean_project() -> Result<(), Box<dyn std::error::Error>> {
+pub fn clean_project() -> anyhow::Result<()> {
     let project_path = dirs::data_dir()
-        .unwrap_or_else(|| dirs::home_dir().expect("Could not find home directory"))
+        .ok_or_else(|| anyhow!("Could not find app directory"))?
         .join("kura")
         .join("crates")
         .join("kura-koto");
@@ -69,17 +75,46 @@ pub fn clean_project() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-pub fn list_packages() -> () {
-    let config = load_config();
+pub fn list_packages() -> anyhow::Result<()> {
+    let config = load_config()?;
 
     if config.packages.is_empty() {
         println!("No packages installed.");
     } else {
         println!("Installed packages:");
         for package in config.packages {
-            let package_type = detect_package_type(&package);
-            let package_name = extract_package_name(&package, &package_type);
-            println!("- {package_name} ({package_type:?})");
+            println!("- {} ({})", package.name(), package.kind().name());
         }
     }
+    Ok(())
+}
+
+pub fn run_project(filename: &str) -> anyhow::Result<()> {
+    let project_path = dirs::data_dir()
+        .ok_or_else(|| anyhow!("Could not find app directory"))?
+        .join("kura")
+        .join("crates")
+        .join("kura-koto");
+
+    let executable_path = if cfg!(target_os = "windows") {
+        project_path
+            .join("target")
+            .join("release")
+            .join("kura-koto.exe")
+    } else {
+        project_path
+            .join("target")
+            .join("release")
+            .join("kura-koto")
+    };
+
+    if !executable_path.exists() {
+        build_rust_project()?;
+    }
+
+    let filename = std::fs::canonicalize(filename)?;
+    let mut child = Command::new(executable_path).arg(filename).spawn()?;
+
+    child.wait()?;
+    Ok(())
 }

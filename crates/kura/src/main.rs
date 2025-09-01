@@ -2,14 +2,12 @@ mod build;
 mod commands;
 mod config;
 mod package;
-mod run;
 
 use build::build_rust_project;
 use clap::{Parser, Subcommand};
 use commands::{install_package, remove_package};
-use run::run_project;
 
-use crate::commands::{clean_project, list_packages};
+use crate::commands::{clean_project, list_packages, run_project};
 
 #[derive(Parser)]
 #[command(name = "kura")]
@@ -41,24 +39,16 @@ pub enum Commands {
 fn main() {
     let cli = Cli::parse();
 
-    match cli.command {
+    let result = match cli.command {
         Commands::Install { source } => install_package(&source),
         Commands::Remove { name } => remove_package(&name),
-        Commands::Build => {
-            if let Err(e) = build_rust_project() {
-                eprintln!("Error: {e}");
-            }
-        }
-        Commands::Run { filename } => {
-            if let Err(e) = run_project(&filename) {
-                eprintln!("Error: {e}");
-            }
-        }
-        Commands::Clean => {
-            if let Err(e) = clean_project() {
-                eprintln!("Error: {e}");
-            }
-        }
+        Commands::Build => build_rust_project(),
+        Commands::Run { filename } => run_project(&filename),
+        Commands::Clean => clean_project(),
         Commands::List => list_packages(),
+    };
+
+    if let Err(e) = result {
+        eprintln!("Error: {e}");
     }
 }

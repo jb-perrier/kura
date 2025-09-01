@@ -1,5 +1,6 @@
+use anyhow::anyhow;
+
 use crate::config::load_config;
-use crate::package::{detect_package_type, extract_package_name};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -8,11 +9,11 @@ const TEMPLATE_MAIN: &str = include_str!("template_main.rs");
 
 pub fn load_cargo_toml<P: AsRef<Path>>(
     folder_path: P,
-) -> Result<toml::Value, Box<dyn std::error::Error>> {
+) -> anyhow::Result<toml::Value> {
     let cargo_toml_path = folder_path.as_ref().join("Cargo.toml");
 
     if !cargo_toml_path.exists() {
-        return Err(format!("Cargo.toml not found in {}", folder_path.as_ref().display()).into());
+        return Err(anyhow!("Cargo.toml not found in {}", folder_path.as_ref().display()));
     }
 
     let content = fs::read_to_string(&cargo_toml_path)?;
@@ -21,9 +22,9 @@ pub fn load_cargo_toml<P: AsRef<Path>>(
     Ok(toml_value)
 }
 
-pub fn build_rust_project() -> Result<(), Box<dyn std::error::Error>> {
+pub fn build_rust_project() -> anyhow::Result<()> {
     let project_path = dirs::data_dir()
-        .unwrap_or_else(|| dirs::home_dir().expect("Could not find home directory"))
+        .ok_or_else(|| anyhow!("Could not find app directory"))?
         .join("kura")
         .join("crates")
         .join("kura-koto");
@@ -43,11 +44,10 @@ pub fn build_rust_project() -> Result<(), Box<dyn std::error::Error>> {
         .output()?;
 
     if !init_output.status.success() {
-        return Err(format!(
+        return Err(anyhow!(
             "Failed to initialize project: {}",
             String::from_utf8_lossy(&init_output.stderr)
-        )
-        .into());
+        ));
     }
 
     // Add koto dependency
@@ -57,15 +57,14 @@ pub fn build_rust_project() -> Result<(), Box<dyn std::error::Error>> {
         .output()?;
 
     if !add_koto_output.status.success() {
-        return Err(format!(
+        return Err(anyhow!(
             "Failed to add 'koto' dependency: {}",
             String::from_utf8_lossy(&add_koto_output.stderr)
-        )
-        .into());
+        ));
     }
 
     // Load config and add path dependencies to Cargo.toml
-    let config = load_config();
+    let config = load_config()?;
     let cargo_toml_path = project_path.join("Cargo.toml");
     let mut insert_prelude_values = Vec::new();
 
@@ -92,19 +91,17 @@ pub fn build_rust_project() -> Result<(), Box<dyn std::error::Error>> {
             .get_mut("dependencies")
             .and_then(|d| d.as_table_mut())
         {
-            for package_source in &config.packages {
-                let package_type = detect_package_type(package_source);
-                let package_name = extract_package_name(package_source, &package_type);
+            for package in &config.packages {
                 let dep_value = toml::Value::Table({
                     let mut table = toml::map::Map::new();
                     table.insert(
                         "path".to_string(),
-                        toml::Value::String(package_source.clone()),
+                        toml::Value::String(package.name().to_string()),
                     );
                     table
                 });
-                dependencies.insert(package_name.clone(), dep_value);
-                let package_name_underscore = package_name.replace('-', "_");
+                dependencies.insert(package.name().to_string(), dep_value);
+                let package_name_underscore = package.name().replace('-', "_");
                 insert_prelude_values.push(format!(
                         "prelude.insert(\"{package_name_underscore}\", {package_name_underscore}::make_module());"
                     ));
@@ -130,11 +127,10 @@ pub fn build_rust_project() -> Result<(), Box<dyn std::error::Error>> {
         .output()?;
 
     if !build_output.status.success() {
-        return Err(format!(
+        return Err(anyhow!(
             "Failed to build project: {}",
             String::from_utf8_lossy(&build_output.stderr)
-        )
-        .into());
+        ));
     }
 
     println!("Built project 'kura-koto' at: {}", project_path.display());

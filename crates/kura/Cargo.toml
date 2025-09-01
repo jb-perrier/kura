@@ -15,6 +15,7 @@ clap = { version = "4.0", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
 dirs = "5.0"
 toml = "0.8"
+anyhow = "1.0.99"
 
 [lints]
 workspace = true

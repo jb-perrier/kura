@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+
+members = ["crates/kura", "demo-lib", "otherlib"]
+
+[workspace.dependencies]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+authors = ["Jean-Baptiste Perrier <jeanbapt.perrier@gmail.com>"]
+license = "MIT"
+repository = "https://github.com/jb-perrier/kura"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+enum_glob_use = "deny"
+pedantic = "deny"
+nursery = "warn"
+unwrap_used = "deny"

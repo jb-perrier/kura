@@ -1,0 +1,13 @@
+[package]
+name = "demo-lib"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+koto = "0.16.0"
+
+[lints]
+workspace = true

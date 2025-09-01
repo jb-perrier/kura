@@ -8,9 +8,12 @@ members = ["crates/kura", "demo-lib", "otherlib"]
 [workspace.package]
 version = "0.1.0"
 edition = "2024"
+description = "A package manager for Koto programming language"
 authors = ["Jean-Baptiste Perrier <jeanbapt.perrier@gmail.com>"]
 license = "MIT"
 repository = "https://github.com/jb-perrier/kura"
+keywords = ["koto", "package-manager", "build-tool", "cli"]
+categories = ["command-line-utilities", "development-tools"]
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

@@ -1,5 +1,5 @@
 use crate::config::load_config;
-use crate::package::{PackageType, detect_package_type, extract_package_name};
+use crate::package::{detect_package_type, extract_package_name};
 use std::fs;
 use std::path::Path;
 use std::process::Command;

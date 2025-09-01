@@ -5,6 +5,10 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 repository.workspace = true
+description = "A package manager for Koto programming language"
+keywords = ["koto", "package-manager", "build-tool", "cli"]
+categories = ["command-line-utilities", "development-tools"]
+# readme = "README.md"
 
 [[bin]]
 name = "kura"

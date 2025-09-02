@@ -16,7 +16,11 @@ impl Package {
         let kind = PackageKind::from_source(source)?;
         let name = find_package_name(source, &kind);
         let local_path = match &kind {
-            PackageKind::Local => source.to_string(),
+            PackageKind::Local => {
+                let absolute_path = std::fs::canonicalize(source)
+                    .map_err(|_| anyhow::anyhow!("Invalid local path: {}", source))?;
+                absolute_path.to_string_lossy().to_string()
+            }
             PackageKind::Github(_) => get_kura_path()?.join("crates").join(&name).to_string_lossy().to_string(),
         };
         Ok(Self { name, kind, local_path })

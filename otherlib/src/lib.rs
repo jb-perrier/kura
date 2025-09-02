@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use koto::runtime::{unexpected_args, KMap, KValue};
 
 #[must_use]

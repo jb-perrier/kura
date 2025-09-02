@@ -26,7 +26,7 @@ pub fn install_package(source: &str) -> anyhow::Result<()> {
                 .join("crates");
             fs::create_dir_all(&dep_dir).expect("Failed to create directory");
             Command::new("git")
-                .args(["clone", repo, ".tmp"])
+                .args(["clone", repo, package.name()])
                 .current_dir(dep_dir)
                 .output()
                 .expect("Failed to clone GitHub repository");

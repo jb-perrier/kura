@@ -76,7 +76,7 @@ pub fn list_packages() -> anyhow::Result<()> {
         println!("No packages installed.");
     } else {
         for package in config.packages.values() {
-            println!("{}@{}", package.name(), package.kind().name().to_lowercase());
+            println!("{} @ {}", package.name(), package.kind().name().to_lowercase());
         }
     }
     Ok(())

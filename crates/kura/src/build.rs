@@ -1,7 +1,7 @@
 use anyhow::anyhow;
 
-use crate::config::load_config;
 use crate::BuildMode;
+use crate::config::load_config;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -31,38 +31,35 @@ pub fn build_rust_project(build_mode: BuildMode) -> anyhow::Result<()> {
         .join("crates")
         .join("koto-local");
 
-    // Remove existing project if it exists
-    if project_path.exists() {
-        fs::remove_dir_all(&project_path)?;
-    }
+    if !project_path.exists() {
+        // Create project directory
+        fs::create_dir_all(&project_path)?;
 
-    // Create project directory
-    fs::create_dir_all(&project_path)?;
+        // Initialize Rust binary project
+        let init_output = Command::new("cargo")
+            .args(["init", "--bin", "--name", "koto-local"])
+            .current_dir(&project_path)
+            .output()?;
 
-    // Initialize Rust binary project
-    let init_output = Command::new("cargo")
-        .args(["init", "--bin", "--name", "koto-local"])
-        .current_dir(&project_path)
-        .output()?;
+        if !init_output.status.success() {
+            return Err(anyhow!(
+                "Failed to initialize project: {}",
+                String::from_utf8_lossy(&init_output.stderr)
+            ));
+        }
 
-    if !init_output.status.success() {
-        return Err(anyhow!(
-            "Failed to initialize project: {}",
-            String::from_utf8_lossy(&init_output.stderr)
-        ));
-    }
+        // Add koto dependency
+        let add_koto_output = Command::new("cargo")
+            .args(["add", "koto"])
+            .current_dir(&project_path)
+            .output()?;
 
-    // Add koto dependency
-    let add_koto_output = Command::new("cargo")
-        .args(["add", "koto"])
-        .current_dir(&project_path)
-        .output()?;
-
-    if !add_koto_output.status.success() {
-        return Err(anyhow!(
-            "Failed to add 'koto' dependency: {}",
-            String::from_utf8_lossy(&add_koto_output.stderr)
-        ));
+        if !add_koto_output.status.success() {
+            return Err(anyhow!(
+                "Failed to add 'koto' dependency: {}",
+                String::from_utf8_lossy(&add_koto_output.stderr)
+            ));
+        }
     }
 
     // Load config and add path dependencies to Cargo.toml
@@ -156,7 +153,10 @@ pub fn set_bin_name(cargo_toml: &mut toml::Value, name: &str) -> anyhow::Result<
     } else {
         let mut bin_table = toml::map::Map::new();
         bin_table.insert("name".to_string(), toml::Value::String(name.to_string()));
-        bin_table.insert("path".to_string(), toml::Value::String("src/main.rs".to_string()));
+        bin_table.insert(
+            "path".to_string(),
+            toml::Value::String("src/main.rs".to_string()),
+        );
         let table = cargo_toml
             .as_table_mut()
             .ok_or_else(|| anyhow!("Invalid TOML structure"))?;

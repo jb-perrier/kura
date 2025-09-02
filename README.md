@@ -1,6 +1,6 @@
 ```
 cargo build
-./target/debug/kura install "C:\Users\jimiv\Documents\Projets\whpk\koto\kura\demo-lib"
-./target/debug/kura install "C:\Users\jimiv\Documents\Projets\whpk\koto\kura\otherlib"
+./target/debug/kura install "<demo-lib absolute path>"
+./target/debug/kura install "<otherlib absolute path>"
 ./target/debug/kura run test.koto
 ```

@@ -1,5 +1,5 @@
 [package]
-name = "demo-lib"
+name = "demo_lib"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

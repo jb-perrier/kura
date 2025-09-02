@@ -19,16 +19,13 @@ pub struct Cli {
 use clap::ValueEnum;
 
 #[derive(Clone, Copy, Debug, ValueEnum)]
+#[derive(Default)]
 pub enum BuildMode {
     Debug,
+    #[default]
     Release,
 }
 
-impl Default for BuildMode {
-    fn default() -> Self {
-        BuildMode::Release
-    }
-}
 
 #[derive(Subcommand)]
 pub enum Commands {

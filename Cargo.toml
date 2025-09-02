@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 
-members = ["crates/kura", "demo-lib", "otherlib"]
+members = ["crates/kura", "crates/demo-lib", "crates/otherlib"]
 
 [workspace.dependencies]
 

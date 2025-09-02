@@ -1,4 +1,4 @@
 demo_lib()
 print otherlib
 print (otherlib.say_hello_to "World")
-print "works great"
+print "works great, super num: {otherlib.my_number}"

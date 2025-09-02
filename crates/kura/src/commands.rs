@@ -59,14 +59,13 @@ pub fn clean_project() -> anyhow::Result<()> {
     let project_path = dirs::data_dir()
         .ok_or_else(|| anyhow!("Could not find app directory"))?
         .join("kura")
-        .join("crates")
-        .join("kura-koto");
+        .join("crates");
 
     if project_path.exists() {
         fs::remove_dir_all(&project_path)?;
     }
 
-    println!("Cleaned project 'kura-koto' at: {}", project_path.display());
+    println!("Cleaned up compiling directory");
     Ok(())
 }
 
